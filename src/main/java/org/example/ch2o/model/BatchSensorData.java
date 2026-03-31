@@ -19,7 +19,6 @@ public class BatchSensorData {
         @SerializedName("uptime_ms")
         private Long uptimeMs;
 
-        private SensorData.MQ135Data mq135;
         private SensorData.CH2OData ch2o;
 
         @SerializedName("wifi_rssi")
@@ -30,9 +29,6 @@ public class BatchSensorData {
 
         public Long getUptimeMs() { return uptimeMs; }
         public void setUptimeMs(Long uptimeMs) { this.uptimeMs = uptimeMs; }
-
-        public SensorData.MQ135Data getMq135() { return mq135; }
-        public void setMq135(SensorData.MQ135Data mq135) { this.mq135 = mq135; }
 
         public SensorData.CH2OData getCh2o() { return ch2o; }
         public void setCh2o(SensorData.CH2OData ch2o) { this.ch2o = ch2o; }

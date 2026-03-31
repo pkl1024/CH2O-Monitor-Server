@@ -34,9 +34,6 @@ public class DatabaseUtil {
                 "device_id TEXT NOT NULL, " +
                 "collect_time TEXT NOT NULL, " +
                 "uptime_seconds INTEGER, " +
-                "mq135_adc INTEGER, " +
-                "mq135_voltage REAL, " +
-                "mq135_digital INTEGER, " +
                 "ch2o_valid INTEGER, " +
                 "ch2o_ppb REAL, " +
                 "ch2o_ppm REAL, " +

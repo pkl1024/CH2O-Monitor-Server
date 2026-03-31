@@ -10,9 +10,8 @@ public class SensorDataDAO {
 
     public void save(SensorData data) throws SQLException {
         String sql = "INSERT INTO sensor_data (device_id, collect_time, uptime_seconds, " +
-                "mq135_adc, mq135_voltage, mq135_digital, " +
                 "ch2o_valid, ch2o_ppb, ch2o_ppm, ch2o_mgm3, wifi_rssi) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -20,29 +19,19 @@ public class SensorDataDAO {
             pstmt.setString(2, data.getTimestamp());
             pstmt.setObject(3, data.getUptimeSeconds());
 
-            if (data.getMq135() != null) {
-                pstmt.setObject(4, data.getMq135().getAdcValue());
-                pstmt.setObject(5, data.getMq135().getVoltage());
-                pstmt.setObject(6, data.getMq135().getDigitalValue());
+            if (data.getCh2o() != null) {
+                pstmt.setObject(4, data.getCh2o().getValid() != null ? (data.getCh2o().getValid() ? 1 : 0) : null);
+                pstmt.setObject(5, data.getCh2o().getConcentrationPpb());
+                pstmt.setObject(6, data.getCh2o().getConcentrationPpm());
+                pstmt.setObject(7, data.getCh2o().getConcentrationMgm3());
             } else {
                 pstmt.setNull(4, Types.INTEGER);
                 pstmt.setNull(5, Types.REAL);
-                pstmt.setNull(6, Types.INTEGER);
+                pstmt.setNull(6, Types.REAL);
+                pstmt.setNull(7, Types.REAL);
             }
 
-            if (data.getCh2o() != null) {
-                pstmt.setObject(7, data.getCh2o().getValid() != null ? (data.getCh2o().getValid() ? 1 : 0) : null);
-                pstmt.setObject(8, data.getCh2o().getConcentrationPpb());
-                pstmt.setObject(9, data.getCh2o().getConcentrationPpm());
-                pstmt.setObject(10, data.getCh2o().getConcentrationMgm3());
-            } else {
-                pstmt.setNull(7, Types.INTEGER);
-                pstmt.setNull(8, Types.REAL);
-                pstmt.setNull(9, Types.REAL);
-                pstmt.setNull(10, Types.REAL);
-            }
-
-            pstmt.setObject(11, data.getWifiRssi());
+            pstmt.setObject(8, data.getWifiRssi());
             pstmt.executeUpdate();
         }
     }
@@ -126,12 +115,6 @@ public class SensorDataDAO {
         data.setTimestamp(rs.getString("collect_time"));
         data.setUptimeSeconds(getLong(rs, "uptime_seconds"));
         data.setWifiRssi(getInt(rs, "wifi_rssi"));
-
-        SensorData.MQ135Data mq135 = new SensorData.MQ135Data();
-        mq135.setAdcValue(getInt(rs, "mq135_adc"));
-        mq135.setVoltage(getDouble(rs, "mq135_voltage"));
-        mq135.setDigitalValue(getInt(rs, "mq135_digital"));
-        data.setMq135(mq135);
 
         SensorData.CH2OData ch2o = new SensorData.CH2OData();
         Integer validInt = getInt(rs, "ch2o_valid");

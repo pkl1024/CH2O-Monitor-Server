@@ -9,27 +9,11 @@ public class SensorData {
     private String timestamp;
     @SerializedName("uptime_seconds")
     private Long uptimeSeconds;
-    private MQ135Data mq135;
     private CH2OData ch2o;
     @SerializedName("wifi_rssi")
     private Integer wifiRssi;
 
     private Long id;
-
-    public static class MQ135Data {
-        @SerializedName("adc_value")
-        private Integer adcValue;
-        private Double voltage;
-        @SerializedName("digital_value")
-        private Integer digitalValue;
-
-        public Integer getAdcValue() { return adcValue; }
-        public void setAdcValue(Integer adcValue) { this.adcValue = adcValue; }
-        public Double getVoltage() { return voltage; }
-        public void setVoltage(Double voltage) { this.voltage = voltage; }
-        public Integer getDigitalValue() { return digitalValue; }
-        public void setDigitalValue(Integer digitalValue) { this.digitalValue = digitalValue; }
-    }
 
     public static class CH2OData {
         @SerializedName("valid")
@@ -59,8 +43,6 @@ public class SensorData {
     public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
     public Long getUptimeSeconds() { return uptimeSeconds; }
     public void setUptimeSeconds(Long uptimeSeconds) { this.uptimeSeconds = uptimeSeconds; }
-    public MQ135Data getMq135() { return mq135; }
-    public void setMq135(MQ135Data mq135) { this.mq135 = mq135; }
     public CH2OData getCh2o() { return ch2o; }
     public void setCh2o(CH2OData ch2o) { this.ch2o = ch2o; }
     public Integer getWifiRssi() { return wifiRssi; }

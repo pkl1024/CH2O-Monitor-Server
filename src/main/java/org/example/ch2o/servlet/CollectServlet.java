@@ -118,9 +118,8 @@ public class CollectServlet extends HttpServlet {
         }
 
         String sql = "INSERT INTO sensor_data (device_id, collect_time, uptime_seconds, " +
-                "mq135_adc, mq135_voltage, mq135_digital, " +
                 "ch2o_valid, ch2o_ppb, ch2o_ppm, ch2o_mgm3, wifi_rssi) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         int savedCount = 0;
         int failCount = 0;
@@ -146,31 +145,20 @@ public class CollectServlet extends HttpServlet {
                         pstmt.setString(2, data.getTimestamp());
                         pstmt.setObject(3, data.getUptimeSeconds());
 
-                        // 处理MQ135数据（允许为null）
-                        if (data.getMq135() != null) {
-                            pstmt.setObject(4, data.getMq135().getAdcValue());
-                            pstmt.setObject(5, data.getMq135().getVoltage());
-                            pstmt.setObject(6, data.getMq135().getDigitalValue());
+                        // 处理CH2O数据（允许为null）
+                        if (data.getCh2o() != null) {
+                            pstmt.setObject(4, data.getCh2o().getValid() != null ? (data.getCh2o().getValid() ? 1 : 0) : null);
+                            pstmt.setObject(5, data.getCh2o().getConcentrationPpb());
+                            pstmt.setObject(6, data.getCh2o().getConcentrationPpm());
+                            pstmt.setObject(7, data.getCh2o().getConcentrationMgm3());
                         } else {
                             pstmt.setNull(4, java.sql.Types.INTEGER);
                             pstmt.setNull(5, java.sql.Types.REAL);
-                            pstmt.setNull(6, java.sql.Types.INTEGER);
+                            pstmt.setNull(6, java.sql.Types.REAL);
+                            pstmt.setNull(7, java.sql.Types.REAL);
                         }
 
-                        // 处理CH2O数据（允许为null）
-                        if (data.getCh2o() != null) {
-                            pstmt.setObject(7, data.getCh2o().getValid() != null ? (data.getCh2o().getValid() ? 1 : 0) : null);
-                            pstmt.setObject(8, data.getCh2o().getConcentrationPpb());
-                            pstmt.setObject(9, data.getCh2o().getConcentrationPpm());
-                            pstmt.setObject(10, data.getCh2o().getConcentrationMgm3());
-                        } else {
-                            pstmt.setNull(7, java.sql.Types.INTEGER);
-                            pstmt.setNull(8, java.sql.Types.REAL);
-                            pstmt.setNull(9, java.sql.Types.REAL);
-                            pstmt.setNull(10, java.sql.Types.REAL);
-                        }
-
-                        pstmt.setObject(11, data.getWifiRssi());
+                        pstmt.setObject(8, data.getWifiRssi());
                         pstmt.addBatch();
                         savedCount++;
                     } catch (Exception e) {
@@ -217,7 +205,6 @@ public class CollectServlet extends HttpServlet {
         data.setDeviceId(deviceId);
         data.setTimestamp(sample.getTimestamp());
         data.setUptimeSeconds(sample.getUptimeMs() != null ? sample.getUptimeMs() / 1000 : null);
-        data.setMq135(sample.getMq135());
         data.setCh2o(sample.getCh2o());
         data.setWifiRssi(sample.getWifiRssi());
         return data;
