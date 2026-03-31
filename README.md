@@ -2,6 +2,8 @@
 
 甲醛浓度监测服务器端 - 接收ESP32设备上报的甲醛传感器数据并提供Web可视化界面。
 
+> **相关项目:** [CH2O-Monitor](https://github.com/pkl1024/CH2O-Monitor) - ESP32 客户端，甲醛传感器数据采集与上报
+
 ## 项目概述
 
 这是一个轻量级Java Web应用，用于收集ESP32设备上报的甲醛(CH2O)传感器数据。使用纯Servlet 4.0 + SQLite + GSON，部署为WAR文件到Tomcat 9+。
