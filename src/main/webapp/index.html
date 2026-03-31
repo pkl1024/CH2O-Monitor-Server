@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>CH2O 甲醛监测系统</title>
+    <script src="js/chart.js"></script>
+    <script src="js/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f5f5;padding:20px;}
+        .container{max-width:1600px;margin:0 auto;background:white;padding:25px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.1);}
+        .header{background:linear-gradient(135deg,#4CAF50,#45a049);color:white;padding:25px;border-radius:12px;margin-bottom:25px;box-shadow:0 4px 15px rgba(0,0,0,0.1);}
+        h1{font-size:2em;margin-bottom:8px;}
+        .subtitle{font-size:1em;opacity:0.95;}
+        .info-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-bottom:25px;}
+        .sensor-card{padding:20px;background:#f8f9fa;border-radius:10px;border-left:5px solid #28a745;}
+        .sensor-card h3{margin-top:0;color:#333;font-size:1.3em;margin-bottom:15px;}
+        .data-item{margin:10px 0;display:flex;justify-content:space-between;align-items:center;padding:10px;background:white;border-radius:6px;}
+        .data-label{font-weight:bold;color:#555;}
+        .data-value{font-family:monospace;font-size:1.05em;color:#333;}
+        .status-indicator{display:inline-block;padding:4px 10px;border-radius:5px;color:white;font-weight:bold;font-size:0.9em;}
+        .status-good{background:#28a745;}
+        .status-warning{background:#ffc107;color:black;}
+        .status-alert{background:#dc3545;}
+        .threshold-legend{display:flex;flex-wrap:wrap;gap:15px;margin-bottom:20px;padding:15px;background:#f8f9fa;border-radius:10px;}
+        .threshold-item{display:flex;align-items:center;gap:8px;}
+        .threshold-color{width:20px;height:20px;border-radius:4px;opacity:0.7;}
+        .btn-group{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0;align-items:center;}
+        .btn{padding:12px 22px;background:#4CAF50;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;transition:all 0.3s;}
+        .btn:hover{background:#45a049;transform:scale(1.05);}
+        .btn-secondary{background:#2196F3;}
+        .btn-secondary:hover{background:#0b7dda;}
+        .btn-warning{background:#ff9800;}
+        .btn-warning:hover{background:#e68900;}
+        .btn.active{background:#333;box-shadow:inset 0 2px 5px rgba(0,0,0,0.3);}
+        .btn:disabled{opacity:0.6;cursor:wait;transform:none;}
+        .no-data{text-align:center;color:#999;padding:40px;}
+        .chart-container{position:relative;height:400px;background:white;padding:20px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+        .chart-container h3{margin-top:0;margin-bottom:15px;color:#333;border-bottom:2px solid #28a745;padding-bottom:8px;}
+        .sample-count{font-size:0.7em;font-weight:normal;color:#6c757d;background:#e9ecef;padding:3px 10px;border-radius:12px;margin-left:10px;}
+        .section-title{margin-top:30px;margin-bottom:15px;color:#333;font-size:1.4em;border-bottom:3px solid #4CAF50;padding-bottom:10px;}
+        .custom-range{display:flex;gap:15px;align-items:center;flex-wrap:wrap;background:#f8f9fa;padding:15px;border-radius:10px;margin-top:15px;}
+        .custom-range label{font-weight:bold;color:#555;}
+        .custom-range input{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;}
+
+        /* 加载进度条样式 */
+        .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;}
+        .loading-spinner{width:50px;height:50px;border:5px solid #f3f3f3;border-top:5px solid #4CAF50;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px;}
+        @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+        .loading-text{font-size:1.2em;color:#333;margin-bottom:15px;}
+        .loading-bar-container{width:300px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;}
+        .loading-bar{height:100%;background:linear-gradient(90deg,#4CAF50,#45a049);width:0%;transition:width 0.3s ease;}
+        .charts-wrapper{opacity:1;transition:opacity 0.3s ease;}
+        .charts-wrapper.loading{opacity:0.4;pointer-events:none;}
+
+        @media(max-width:768px){.info-panel{grid-template-columns:1fr;}.header{text-align:center;}.custom-range{flex-direction:column;align-items:stretch;}}
+    </style>
+</head>
+<body>
+<div class='container'>
+    <div class='header'>
+        <h1>📊 CH2O 甲醛监测系统</h1>
+        <div class='subtitle'>甲醛浓度历史数据查看</div>
+    </div>
+
+    <!-- 加载遮罩层 -->
+    <div id='loading-overlay' class='loading-overlay' style='display:none;'>
+        <div class='loading-spinner'></div>
+        <div class='loading-text' id='loading-text'>正在加载数据...</div>
+        <div class='loading-bar-container'>
+            <div class='loading-bar' id='loading-bar'></div>
+        </div>
+    </div>
+
+    <div id='info-panel-container' style='display:none;'>
+        <div class='info-panel' id='info-panel'>
+        </div>
+    </div>
+
+    <div class='sensor-card' style='margin-bottom:25px;'>
+        <h3>🔍 数据时间范围选择</h3>
+        <div class='btn-group'>
+            <button class='btn btn-secondary' onclick='switchData("minute")' id='btn-minute'>最近1分钟</button>
+            <button class='btn btn-secondary' onclick='switchData("3minutes")' id='btn-3minutes'>最近3分钟</button>
+            <button class='btn btn-secondary' onclick='switchData("5minutes")' id='btn-5minutes'>最近5分钟</button>
+            <button class='btn active' onclick='switchData("10minutes")' id='btn-10minutes'>最近10分钟</button>
+            <button class='btn btn-warning' onclick='switchData("30minutes")' id='btn-30minutes'>最近30分钟</button>
+            <button class='btn btn-warning' onclick='switchData("hour")' id='btn-hour'>最近1小时</button>
+            <button class='btn btn-warning' onclick='switchData("day")' id='btn-day'>最近1天</button>
+            <button class='btn btn-warning' onclick='switchData("threedays")' id='btn-threedays'>最近3天</button>
+            <a href='api/data/latest' class='btn btn-secondary' target='_blank'>最新数据(JSON)</a>
+        </div>
+        <div class='custom-range'>
+            <label>开始时间:</label>
+            <input type='datetime-local' id='startTime'>
+            <label>结束时间:</label>
+            <input type='datetime-local' id='endTime'>
+            <button class='btn btn-secondary' onclick='loadCustomRange()' id='btn-custom-range'>查询自定义范围</button>
+        </div>
+    </div>
+
+    <div class='threshold-legend'>
+        <strong>甲醛健康阈值 (GB/T 18883-2002):</strong>
+        <div class='threshold-item'><div class='threshold-color' style='background:#28a745;'></div><span>正常 (≤0.08 mg/m³)</span></div>
+        <div class='threshold-item'><div class='threshold-color' style='background:#ffc107;'></div><span>注意 (0.08-0.1 mg/m³)</span></div>
+        <div class='threshold-item'><div class='threshold-color' style='background:#fd7e14;'></div><span>警告 (0.1-0.3 mg/m³)</span></div>
+        <div class='threshold-item'><div class='threshold-color' style='background:#dc3545;'></div><span>警报 (>0.3 mg/m³)</span></div>
+    </div>
+
+    <h2 class='section-title'>📈 数据趋势图</h2>
+
+    <div id='charts-wrapper' class='charts-wrapper'>
+        <div class='chart-container'>
+            <h3>甲醛浓度 (mg/m³) <span id='ch2o-sample-count' class='sample-count'></span></h3>
+            <canvas id='ch2oChart'></canvas>
+        </div>
+    </div>
+
+    <div id='no-data' style='display:none;'>
+        <div class='sensor-card' style='margin-top:25px;'><div class='no-data'>
+            <h2>暂无数据</h2><p>等待ESP32设备上报数据...</p>
+            <p style='margin-top:20px;color:#666;'>请确保ESP32已配置数据上报地址为: <code>http://[你的电脑IP]:8080/CH2O-Monitor-Server/api/collect</code></p>
+        </div></div>
+    </div>
+</div>
+
+<script>
+    let currentData = [];
+    let ch2oChart;
+    let currentRange = '10minutes';
+    let isLoading = false;
+
+    // 显示加载状态
+    function showLoading(text) {
+        isLoading = true;
+        const overlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const loadingBar = document.getElementById('loading-bar');
+        const chartsWrapper = document.getElementById('charts-wrapper');
+
+        if (text) loadingText.textContent = text;
+        overlay.style.display = 'flex';
+        chartsWrapper.classList.add('loading');
+
+        // 禁用所有按钮
+        document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
+
+        // 模拟进度条动画
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 20;
+            if (progress > 90) progress = 90;
+            loadingBar.style.width = progress + '%';
+            if (!isLoading) {
+                clearInterval(interval);
+            }
+        }, 200);
+        return interval;
+    }
+
+    // 隐藏加载状态
+    function hideLoading(progressInterval) {
+        isLoading = false;
+        const overlay = document.getElementById('loading-overlay');
+        const loadingBar = document.getElementById('loading-bar');
+        const chartsWrapper = document.getElementById('charts-wrapper');
+
+        if (progressInterval) clearInterval(progressInterval);
+
+        loadingBar.style.width = '100%';
+
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            loadingBar.style.width = '0%';
+            chartsWrapper.classList.remove('loading');
+            // 启用所有按钮
+            document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
+        }, 300);
+    }
+
+    // 生成时间标签数组 - 只在新的一天第一条数据显示日期
+    function generateTimeLabels(data) {
+        const labels = [];
+        let lastDate = '';
+        data.forEach((d, index) => {
+            if (!d.timestamp) {
+                labels.push('');
+                return;
+            }
+            const currentDate = d.timestamp.substring(0, 10);
+            if (currentDate !== lastDate) {
+                // 新的一天，显示日期+时间
+                labels.push(d.timestamp.substring(5, 16));
+                lastDate = currentDate;
+            } else {
+                // 同一天，只显示时间
+                labels.push(d.timestamp.substring(11));
+            }
+        });
+        return labels;
+    }
+
+    function getJson(url, callback) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                callback(JSON.parse(xhr.responseText));
+            } else {
+                callback(null);
+            }
+        };
+        xhr.onerror = function() { callback(null); };
+        xhr.send();
+    }
+
+    // 格式化日期为 datetime-local 输入框格式 (YYYY-MM-DDTHH:mm)
+    function formatDateTimeLocal(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    // 根据时间范围类型填充时间框
+    function fillTimeRange(range) {
+        const now = new Date();
+        let startTime = new Date();
+
+        switch(range) {
+            case 'minute': startTime = new Date(now - 1 * 60 * 1000); break;
+            case '3minutes': startTime = new Date(now - 3 * 60 * 1000); break;
+            case '5minutes': startTime = new Date(now - 5 * 60 * 1000); break;
+            case '10minutes': startTime = new Date(now - 10 * 60 * 1000); break;
+            case '30minutes': startTime = new Date(now - 30 * 60 * 1000); break;
+            case 'hour': startTime = new Date(now - 60 * 60 * 1000); break;
+            case 'day': startTime = new Date(now - 24 * 60 * 60 * 1000); break;
+            case 'threedays': startTime = new Date(now - 3 * 24 * 60 * 60 * 1000); break;
+            default: return;
+        }
+
+        document.getElementById('startTime').value = formatDateTimeLocal(startTime);
+        document.getElementById('endTime').value = formatDateTimeLocal(now);
+    }
+
+    function switchData(range) {
+        currentRange = range;
+        const buttons = document.querySelectorAll('.btn');
+        for (let i = 0; i < buttons.length; i++) { buttons[i].classList.remove('active'); }
+        const activeBtn = document.getElementById('btn-' + range);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        // 填充时间框
+        fillTimeRange(range);
+
+        let url;
+        if (range === 'minute') url = 'api/data/minute';
+        else if (range === '3minutes') url = 'api/data/3minutes';
+        else if (range === '5minutes') url = 'api/data/5minutes';
+        else if (range === '10minutes') url = 'api/data/10minutes';
+        else if (range === '30minutes') url = 'api/data/30minutes';
+        else if (range === 'hour') url = 'api/data/hour';
+        else if (range === 'day') url = 'api/data/day';
+        else url = 'api/data/threedays';
+
+        const progressInterval = showLoading('正在加载数据...');
+        getJson(url, function(data) {
+            currentData = sortDataByTime(data || []);
+            updateCharts();
+            renderInfoPanel(currentData.length > 0 ? currentData[currentData.length - 1] : null);
+            hideLoading(progressInterval);
+        });
+    }
+
+    function loadCustomRange() {
+        const start = document.getElementById('startTime').value;
+        const end = document.getElementById('endTime').value;
+        if (!start || !end) { alert('请选择开始和结束时间'); return; }
+        const startStr = start.replace('T', ' ') + ':00';
+        const endStr = end.replace('T', ' ') + ':00';
+
+        const buttons = document.querySelectorAll('.btn');
+        for (let i = 0; i < buttons.length; i++) { buttons[i].classList.remove('active'); }
+
+        const progressInterval = showLoading('正在查询自定义范围数据...');
+        getJson('api/data/range?start=' + encodeURIComponent(startStr) + '&end=' + encodeURIComponent(endStr), function(data) {
+            currentData = sortDataByTime(data || []);
+            updateCharts();
+            renderInfoPanel(currentData.length > 0 ? currentData[currentData.length - 1] : null);
+            hideLoading(progressInterval);
+        });
+    }
+
+    function getCh2oColor(value) {
+        if (value <= 0.08) return {border: 'rgb(40, 167, 69)', bg: 'rgba(40, 167, 69, 0.2)'};
+        else if (value <= 0.1) return {border: 'rgb(255, 193, 7)', bg: 'rgba(255, 193, 7, 0.2)'};
+        else if (value <= 0.3) return {border: 'rgb(253, 126, 20)', bg: 'rgba(253, 126, 20, 0.2)'};
+        else return {border: 'rgb(220, 53, 69)', bg: 'rgba(220, 53, 69, 0.2)'};
+    }
+
+    function renderInfoPanel(latest) {
+        const container = document.getElementById('info-panel-container');
+        const panel = document.getElementById('info-panel');
+        const noData = document.getElementById('no-data');
+
+        if (!latest) {
+            container.style.display = 'none';
+            noData.style.display = 'block';
+            return;
+        }
+
+        container.style.display = 'block';
+        noData.style.display = 'none';
+
+        const ch2o = latest.ch2o || {};
+
+        let ch2oValidClass = 'status-alert';
+        let ch2oValidText = '无效';
+        if (ch2o.valid) {
+            ch2oValidClass = 'status-good';
+            ch2oValidText = '有效';
+        }
+
+        let healthStatus = '未知';
+        let healthClass = '';
+        if (ch2o.concentration_mgm3 != null) {
+            if (ch2o.concentration_mgm3 <= 0.08) { healthStatus = '合格'; healthClass = 'status-good'; }
+            else if (ch2o.concentration_mgm3 <= 0.1) { healthStatus = '注意'; healthClass = 'status-warning'; }
+            else { healthStatus = '超标'; healthClass = 'status-alert'; }
+        }
+
+        panel.innerHTML = `
+            <div class='sensor-card'>
+                <h3>🏠 甲醛数据 (ZE08-CH2O)</h3>
+                <div class='data-item'><span class='data-label'>浓度 (mg/m³):</span><span class='data-value'>${ch2o.concentration_mgm3 != null ? ch2o.concentration_mgm3.toFixed(4) : '-'}</span></div>
+                <div class='data-item'><span class='data-label'>浓度 (ppm):</span><span class='data-value'>${ch2o.concentration_ppm != null ? ch2o.concentration_ppm.toFixed(4) : '-'}</span></div>
+                <div class='data-item'><span class='data-label'>浓度 (ppb):</span><span class='data-value'>${ch2o.concentration_ppb != null ? ch2o.concentration_ppb.toFixed(2) : '-'}</span></div>
+                <div class='data-item'><span class='data-label'>数据状态:</span><span class='data-value'><span class='status-indicator ${ch2oValidClass}'>${ch2oValidText}</span></span></div>
+                <div class='data-item'><span class='data-label'>健康状态:</span><span class='data-value'>${healthClass ? '<span class="status-indicator ' + healthClass + '">' + healthStatus + '</span>' : '-'}</span></div>
+            </div>
+            <div class='sensor-card'>
+                <h3>📡 设备信息</h3>
+                <div class='data-item'><span class='data-label'>设备ID:</span><span class='data-value'>${latest.device_id || '-'}</span></div>
+                <div class='data-item'><span class='data-label'>采集时间:</span><span class='data-value'>${latest.timestamp || '-'}</span></div>
+                <div class='data-item'><span class='data-label'>运行时间:</span><span class='data-value'>${latest.uptime_seconds != null ? latest.uptime_seconds + 's' : '-'}</span></div>
+                <div class='data-item'><span class='data-label'>WiFi信号:</span><span class='data-value'>${latest.wifi_rssi != null ? latest.wifi_rssi + ' dBm' : '-'}</span></div>
+            </div>
+        `;
+    }
+
+    function initCharts() {
+        const ch2oCtx = document.getElementById('ch2oChart').getContext('2d');
+
+        ch2oChart = new Chart(ch2oCtx, {
+            type: 'line',
+            data: {datasets: [{label: '甲醛 (mg/m³)', data: [], borderColor: 'rgb(40, 167, 69)', backgroundColor: 'rgba(40, 167, 69, 0.2)', borderWidth: 2, tension: 0.1, fill: true, pointRadius: 0, spanGaps: false}]},
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    annotation: {
+                        annotations: {
+                            normalArea: {type: 'box', yMin: 0, yMax: 0.08, backgroundColor: 'rgba(40, 167, 69, 0.1)', borderColor: 'rgba(40, 167, 69, 0.3)', borderWidth: 1},
+                            warningArea: {type: 'box', yMin: 0.08, yMax: 0.1, backgroundColor: 'rgba(255, 193, 7, 0.15)', borderColor: 'rgba(255, 193, 7, 0.4)', borderWidth: 1},
+                            alertArea: {type: 'box', yMin: 0.1, yMax: 0.3, backgroundColor: 'rgba(253, 126, 20, 0.15)', borderColor: 'rgba(253, 126, 20, 0.4)', borderWidth: 1},
+                            dangerArea: {type: 'box', yMin: 0.3, yMax: 0.5, backgroundColor: 'rgba(220, 53, 69, 0.15)', borderColor: 'rgba(220, 53, 69, 0.4)', borderWidth: 1},
+                            line1: {type: 'line', yMin: 0.08, yMax: 0.08, borderColor: 'rgb(40, 167, 69)', borderWidth: 2, borderDash: [5, 5], label: {display: true, content: '国标 0.08', position: 'start', backgroundColor: 'rgba(40, 167, 69, 0.8)', color: 'white', font: {size: 10, weight: 'bold'}, padding: 4}} ,
+                            line2: {type: 'line', yMin: 0.1, yMax: 0.1, borderColor: 'rgb(255, 193, 7)', borderWidth: 2, borderDash: [5, 5], label: {display: true, content: '注意 0.10', position: 'start', backgroundColor: 'rgba(255, 193, 7, 0.9)', color: 'black', font: {size: 10, weight: 'bold'}, padding: 4}} ,
+                            line3: {type: 'line', yMin: 0.3, yMax: 0.3, borderColor: 'rgb(220, 53, 69)', borderWidth: 2, borderDash: [5, 5], label: {display: true, content: '警报 0.30', position: 'start', backgroundColor: 'rgba(220, 53, 69, 0.9)', color: 'white', font: {size: 10, weight: 'bold'}, padding: 4}}
+                        }
+                    }
+                },
+                scales: {
+                    x: {type: 'category', title: {display: true, text: '时间'}, reverse: false} ,
+                    y: {beginAtZero: true, max: 0.5, title: {display: true, text: '甲醛 (mg/m³)'}, ticks: {callback: function(v){return v.toFixed(2);}}}
+                }
+            }
+        });
+    }
+
+    function sortDataByTime(data) {
+        const result = [...data].filter(d => d && d.timestamp).sort((a, b) => {
+            const timeA = new Date(a.timestamp).getTime();
+            const timeB = new Date(b.timestamp).getTime();
+            return timeA - timeB;
+        });
+        return result;
+    }
+
+    /**
+     * 检测数据时间间隔，在超过阈值的地方插入 null 值使图表断开
+     * ESP32 采样间隔通常是几秒，超过 15 秒认为是数据缺失
+     */
+    function insertNullsForGaps(data) {
+        if (data.length < 2) return data;
+
+        const result = [];
+        const GAP_THRESHOLD_MS = 15 * 1000; // 15秒阈值
+
+        result.push(data[0]);
+
+        for (let i = 1; i < data.length; i++) {
+            const prevTime = new Date(data[i - 1].timestamp).getTime();
+            const currTime = new Date(data[i].timestamp).getTime();
+            const gap = currTime - prevTime;
+
+            if (gap > GAP_THRESHOLD_MS) {
+                // 插入 null 数据点来断开图表
+                result.push({
+                    timestamp: null,
+                    ch2o: null
+                });
+            }
+            result.push(data[i]);
+        }
+
+        return result;
+    }
+
+    function updateCharts() {
+        const sortedData = sortDataByTime(currentData);
+        const dataWithGaps = insertNullsForGaps(sortedData);
+
+        // 计算实际采样条数（排除插入的null间隔点）
+        const actualSampleCount = sortedData.length;
+
+        // 更新采样条数显示
+        document.getElementById('ch2o-sample-count').textContent = actualSampleCount + ' 条';
+
+        let labels = generateTimeLabels(dataWithGaps);
+        let ch2oValues = [];
+
+        if (dataWithGaps.length > 0) {
+            dataWithGaps.forEach(d => {
+                ch2oValues.push(d.ch2o && d.ch2o.concentration_mgm3 != null ? d.ch2o.concentration_mgm3 : null);
+            });
+        }
+
+        if (labels.length >= 2) {
+            const firstTime = new Date('2000-01-01 ' + labels[0]);
+            const lastTime = new Date('2000-01-01 ' + labels[labels.length - 1]);
+            if (firstTime > lastTime) {
+                labels.reverse();
+                ch2oValues.reverse();
+            }
+        }
+
+        // 判断是否有日期显示
+        const hasDate = labels.some(l => l && l.length > 8);
+
+        ch2oChart.data.labels = labels;
+        ch2oChart.data.datasets[0].data = ch2oValues;
+        ch2oChart.options.scales.x.title.text = hasDate ? '日期时间' : '时间';
+
+        let maxY = 0.5;
+        const validCh2oValues = ch2oValues.filter(v => v != null);
+        if (validCh2oValues.length > 0) {
+            const dataMax = Math.max(...validCh2oValues);
+            if (dataMax <= 0.08) {
+                maxY = 0.08;
+            } else {
+                maxY = Math.ceil(dataMax * 100) / 100;
+            }
+        }
+        ch2oChart.options.scales.y.max = maxY;
+        if (maxY > 0.3) {
+            ch2oChart.options.plugins.annotation.annotations.dangerArea.yMax = maxY;
+        } else {
+            ch2oChart.options.plugins.annotation.annotations.dangerArea.yMax = 0.3;
+        }
+
+        if (validCh2oValues.length > 0) {
+            const lastVal = validCh2oValues[validCh2oValues.length - 1];
+            if (lastVal != null) {
+                const colors = getCh2oColor(lastVal);
+                ch2oChart.data.datasets[0].borderColor = colors.border;
+                ch2oChart.data.datasets[0].backgroundColor = colors.bg;
+            }
+        }
+        ch2oChart.update('none');
+    }
+
+    function loadLatestAndData() {
+        const progressInterval = showLoading('正在加载数据...');
+        let completed = 0;
+        const totalTasks = 2;
+
+        const checkComplete = () => {
+            completed++;
+            if (completed >= totalTasks) {
+                hideLoading(progressInterval);
+            }
+        };
+
+        getJson('api/data/latest', function(latest) {
+            renderInfoPanel(latest);
+            checkComplete();
+        });
+        getJson('api/data/' + currentRange, function(data) {
+            currentData = sortDataByTime(data || []);
+            updateCharts();
+            checkComplete();
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initCharts();
+        loadLatestAndData();
+    });
+</script>
+</body>
+</html>

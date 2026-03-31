@@ -1,0 +1,12 @@
+# IDE
+.idea/
+*.iml
+
+# Maven
+target/
+
+# Database
+data/
+
+# Logs
+*.log
