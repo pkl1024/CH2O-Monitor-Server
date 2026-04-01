@@ -48,21 +48,52 @@ public class SensorDataDAO {
         return null;
     }
 
+    public SensorData findLatest(String deviceId) throws SQLException {
+        String sql = "SELECT * FROM sensor_data WHERE device_id = ? ORDER BY id DESC LIMIT 1";
+        try (Connection conn = DatabaseUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, deviceId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return extractData(rs);
+                }
+            }
+        }
+        return null;
+    }
+
     public List<SensorData> findLastMinutes(int minutes) throws SQLException {
         String sql = "SELECT * FROM sensor_data WHERE collect_time >= datetime('now', '-" + minutes + " minutes', 'localtime') ORDER BY collect_time DESC";
         return queryList(sql);
+    }
+
+    public List<SensorData> findLastMinutes(int minutes, String deviceId) throws SQLException {
+        String sql = "SELECT * FROM sensor_data WHERE device_id = ? AND collect_time >= datetime('now', '-" + minutes + " minutes', 'localtime') ORDER BY collect_time DESC";
+        return queryListWithDevice(sql, deviceId);
     }
 
     public List<SensorData> findLastHour() throws SQLException {
         return findLastMinutes(60);
     }
 
+    public List<SensorData> findLastHour(String deviceId) throws SQLException {
+        return findLastMinutes(60, deviceId);
+    }
+
     public List<SensorData> findLastDay() throws SQLException {
         return findLastMinutes(60 * 24);
     }
 
+    public List<SensorData> findLastDay(String deviceId) throws SQLException {
+        return findLastMinutes(60 * 24, deviceId);
+    }
+
     public List<SensorData> findLastThreeDays() throws SQLException {
         return findLastMinutes(60 * 24 * 3);
+    }
+
+    public List<SensorData> findLastThreeDays(String deviceId) throws SQLException {
+        return findLastMinutes(60 * 24 * 3, deviceId);
     }
 
     public List<SensorData> findByRange(String start, String end) throws SQLException {
@@ -72,6 +103,23 @@ public class SensorDataDAO {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, start);
             pstmt.setString(2, end);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(extractData(rs));
+                }
+            }
+        }
+        return list;
+    }
+
+    public List<SensorData> findByRange(String start, String end, String deviceId) throws SQLException {
+        String sql = "SELECT * FROM sensor_data WHERE device_id = ? AND collect_time BETWEEN ? AND ? ORDER BY collect_time DESC";
+        List<SensorData> list = new ArrayList<>();
+        try (Connection conn = DatabaseUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, deviceId);
+            pstmt.setString(2, start);
+            pstmt.setString(3, end);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     list.add(extractData(rs));
@@ -96,6 +144,22 @@ public class SensorDataDAO {
         return list;
     }
 
+    public List<SensorData> findAll(int limit, String deviceId) throws SQLException {
+        String sql = "SELECT * FROM sensor_data WHERE device_id = ? ORDER BY collect_time DESC LIMIT ?";
+        List<SensorData> list = new ArrayList<>();
+        try (Connection conn = DatabaseUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, deviceId);
+            pstmt.setInt(2, limit);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(extractData(rs));
+                }
+            }
+        }
+        return list;
+    }
+
     private List<SensorData> queryList(String sql) throws SQLException {
         List<SensorData> list = new ArrayList<>();
         try (Connection conn = DatabaseUtil.getConnection();
@@ -103,6 +167,20 @@ public class SensorDataDAO {
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 list.add(extractData(rs));
+            }
+        }
+        return list;
+    }
+
+    private List<SensorData> queryListWithDevice(String sql, String deviceId) throws SQLException {
+        List<SensorData> list = new ArrayList<>();
+        try (Connection conn = DatabaseUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, deviceId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(extractData(rs));
+                }
             }
         }
         return list;

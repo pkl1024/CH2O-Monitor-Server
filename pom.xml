@@ -35,7 +35,7 @@
     </dependencies>
 
     <build>
-        <finalName>CH2O-Monitor-Server</finalName>
+        <finalName>DataCollection</finalName>
     </build>
 
 </project>

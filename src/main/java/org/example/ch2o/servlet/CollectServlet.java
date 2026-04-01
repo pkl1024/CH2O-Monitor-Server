@@ -2,6 +2,7 @@ package org.example.ch2o.servlet;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.example.ch2o.config.DeviceConfig;
 import org.example.ch2o.db.DatabaseUtil;
 import org.example.ch2o.db.SensorDataDAO;
 import org.example.ch2o.model.BatchSensorData;
@@ -53,13 +54,41 @@ public class CollectServlet extends HttpServlet {
             String jsonBody = sb.toString();
             System.out.println("[Collect] 请求体长度: " + jsonBody.length() + " 字节");
 
+            // 空请求直接返回
+            if (jsonBody == null || jsonBody.trim().isEmpty()) {
+                System.out.println("[Collect] 空请求，忽略");
+                result.put("success", false);
+                result.put("message", "空请求");
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print(CommonUtil.getGson().toJson(result));
+                out.flush();
+                return;
+            }
+
             // 2. 解析JSON
             JsonObject jsonObj = JsonParser.parseString(jsonBody).getAsJsonObject();
             System.out.println("[Collect] JSON解析成功");
 
             int savedCount = 0;
 
-            // 3. 判断是批量数据还是单条数据
+            // 3. 获取设备ID并验证
+            String deviceId = null;
+            if (jsonObj.has("device_id")) {
+                deviceId = jsonObj.get("device_id").getAsString();
+            }
+
+            // 验证设备是否已注册
+            if (!DeviceConfig.getInstance().isDeviceRegistered(deviceId)) {
+                System.out.println("[Collect] 设备未注册: " + deviceId);
+                result.put("success", false);
+                result.put("message", "此设备未记录，请联系管理员");
+                resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                out.print(CommonUtil.getGson().toJson(result));
+                out.flush();
+                return;
+            }
+
+            // 4. 判断是批量数据还是单条数据
             if (jsonObj.has("samples") && jsonObj.has("batch_size")) {
                 System.out.println("[Collect] 检测到批量数据格式");
 

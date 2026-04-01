@@ -44,6 +44,17 @@
         .custom-range label{font-weight:bold;color:#555;}
         .custom-range input{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;}
 
+        /* 登录区域样式 */
+        .login-panel{background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:20px;margin-bottom:25px;}
+        .login-panel h3{color:#856404;margin-bottom:15px;}
+        .login-form{display:flex;gap:15px;align-items:center;flex-wrap:wrap;}
+        .login-form input{padding:10px 15px;border:1px solid #ddd;border-radius:6px;font-size:14px;flex:1;min-width:200px;}
+        .user-info{display:flex;gap:20px;align-items:center;flex-wrap:wrap;}
+        .user-badge{background:#28a745;color:white;padding:8px 15px;border-radius:20px;font-weight:bold;}
+        .admin-badge{background:#dc3545;}
+        .device-selector{display:flex;gap:10px;align-items:center;}
+        .device-selector select{padding:10px 15px;border:1px solid #ddd;border-radius:6px;font-size:14px;min-width:200px;}
+
         /* 加载进度条样式 */
         .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;}
         .loading-spinner{width:50px;height:50px;border:5px solid #f3f3f3;border-top:5px solid #4CAF50;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px;}
@@ -54,14 +65,37 @@
         .charts-wrapper{opacity:1;transition:opacity 0.3s ease;}
         .charts-wrapper.loading{opacity:0.4;pointer-events:none;}
 
-        @media(max-width:768px){.info-panel{grid-template-columns:1fr;}.header{text-align:center;}.custom-range{flex-direction:column;align-items:stretch;}}
+        @media(max-width:768px){.info-panel{grid-template-columns:1fr;}.header{text-align:center;}.custom-range{flex-direction:column;align-items:stretch;}.login-form{flex-direction:column;}.user-info{flex-direction:column;align-items:flex-start;}}
     </style>
 </head>
 <body>
 <div class='container'>
     <div class='header'>
-        <h1>📊 CH2O 甲醛监测系统</h1>
+        <h1>CH2O 甲醛监测系统</h1>
         <div class='subtitle'>甲醛浓度历史数据查看</div>
+    </div>
+
+    <!-- 登录区域 -->
+    <div id='login-panel' class='login-panel'>
+        <h3>请输入设备ID登录</h3>
+        <div class='login-form'>
+            <input type='text' id='device-id-input' placeholder='请输入设备ID'>
+            <button class='btn btn-secondary' onclick='login()'>登录</button>
+        </div>
+    </div>
+
+    <!-- 用户信息区域（登录后显示） -->
+    <div id='user-panel' class='sensor-card' style='display:none;margin-bottom:25px;'>
+        <h3>用户信息</h3>
+        <div class='user-info'>
+            <span>设备: <span id='device-name' class='user-badge'></span></span>
+            <span id='admin-indicator' style='display:none;'>(<span class='user-badge admin-badge'>管理员</span>)</span>
+            <div id='device-selector-container' class='device-selector' style='display:none;'>
+                <label>切换设备:</label>
+                <select id='device-select' onchange='onDeviceChange()'></select>
+            </div>
+            <button class='btn btn-warning' onclick='logout()' style='margin-left:auto;'>退出登录</button>
+        </div>
     </div>
 
     <!-- 加载遮罩层 -->
@@ -79,17 +113,16 @@
     </div>
 
     <div class='sensor-card' style='margin-bottom:25px;'>
-        <h3>🔍 数据时间范围选择</h3>
+        <h3>数据时间范围选择</h3>
         <div class='btn-group'>
             <button class='btn btn-secondary' onclick='switchData("minute")' id='btn-minute'>最近1分钟</button>
             <button class='btn btn-secondary' onclick='switchData("3minutes")' id='btn-3minutes'>最近3分钟</button>
             <button class='btn btn-secondary' onclick='switchData("5minutes")' id='btn-5minutes'>最近5分钟</button>
-            <button class='btn active' onclick='switchData("10minutes")' id='btn-10minutes'>最近10分钟</button>
+            <button class='btn btn-active' onclick='switchData("10minutes")' id='btn-10minutes'>最近10分钟</button>
             <button class='btn btn-warning' onclick='switchData("30minutes")' id='btn-30minutes'>最近30分钟</button>
             <button class='btn btn-warning' onclick='switchData("hour")' id='btn-hour'>最近1小时</button>
             <button class='btn btn-warning' onclick='switchData("day")' id='btn-day'>最近1天</button>
             <button class='btn btn-warning' onclick='switchData("threedays")' id='btn-threedays'>最近3天</button>
-            <a href='api/data/latest' class='btn btn-secondary' target='_blank'>最新数据(JSON)</a>
         </div>
         <div class='custom-range'>
             <label>开始时间:</label>
@@ -108,7 +141,7 @@
         <div class='threshold-item'><div class='threshold-color' style='background:#dc3545;'></div><span>警报 (>0.3 mg/m³)</span></div>
     </div>
 
-    <h2 class='section-title'>📈 数据趋势图</h2>
+    <h2 class='section-title'>数据趋势图</h2>
 
     <div id='charts-wrapper' class='charts-wrapper'>
         <div class='chart-container'>
@@ -130,6 +163,122 @@
     let ch2oChart;
     let currentRange = '10minutes';
     let isLoading = false;
+
+    // 设备状态
+    let currentDeviceId = null;
+    let targetDeviceId = null;  // 管理员查看的目标设备
+    let isAdmin = false;
+
+    // 页面加载时检查登录状态
+    document.addEventListener('DOMContentLoaded', function() {
+        initCharts();
+        loadLoginState();
+    });
+
+    // 从localStorage加载登录状态
+    function loadLoginState() {
+        const savedDeviceId = localStorage.getItem('ch2o_device_id');
+        if (savedDeviceId) {
+            document.getElementById('device-id-input').value = savedDeviceId;
+            login();
+        }
+    }
+
+    // 登录
+    function login() {
+        const deviceId = document.getElementById('device-id-input').value.trim();
+        if (!deviceId) {
+            alert('请输入设备ID');
+            return;
+        }
+
+        currentDeviceId = deviceId;
+        localStorage.setItem('ch2o_device_id', deviceId);
+
+        // 获取设备信息
+        getJson('api/data/devices?device_id=' + encodeURIComponent(deviceId), function(data) {
+            if (!data || !data.success) {
+                alert(data ? data.message : '登录失败');
+                currentDeviceId = null;
+                localStorage.removeItem('ch2o_device_id');
+                return;
+            }
+
+            // 显示设备信息
+            document.getElementById('login-panel').style.display = 'none';
+            document.getElementById('user-panel').style.display = 'block';
+            document.getElementById('device-name').textContent = data.device_name;
+            isAdmin = data.is_admin;
+            document.getElementById('admin-indicator').style.display = isAdmin ? 'inline' : 'none';
+
+            const devices = data.devices || {};
+            const deviceIds = Object.keys(devices);
+
+            if (deviceIds.length === 0) {
+                alert('您没有可访问的设备');
+                logout();
+                return;
+            }
+
+            // 管理员显示设备选择器
+            if (isAdmin) {
+                const deviceSelect = document.getElementById('device-select');
+                deviceSelect.innerHTML = '';
+                deviceIds.forEach(function(id) {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = devices[id] + ' (' + id + ')';
+                    deviceSelect.appendChild(option);
+                });
+                targetDeviceId = deviceIds[0];
+                document.getElementById('device-selector-container').style.display = 'flex';
+            } else {
+                // 普通用户只能看自己的设备
+                targetDeviceId = deviceId;
+            }
+
+            // 加载数据
+            loadLatestAndData();
+        });
+    }
+
+    // 退出登录
+    function logout() {
+        currentDeviceId = null;
+        targetDeviceId = null;
+        isAdmin = false;
+        localStorage.removeItem('ch2o_device_id');
+
+        document.getElementById('login-panel').style.display = 'block';
+        document.getElementById('user-panel').style.display = 'none';
+        document.getElementById('device-selector-container').style.display = 'none';
+        document.getElementById('info-panel-container').style.display = 'none';
+        document.getElementById('no-data').style.display = 'block';
+
+        // 清空图表
+        if (ch2oChart) {
+            ch2oChart.data.labels = [];
+            ch2oChart.data.datasets[0].data = [];
+            ch2oChart.update();
+        }
+    }
+
+    // 设备切换（仅管理员）
+    function onDeviceChange() {
+        targetDeviceId = document.getElementById('device-select').value;
+        loadLatestAndData();
+    }
+
+    // 构建带认证参数的URL
+    function buildAuthUrl(baseUrl) {
+        let url = baseUrl;
+        const separator = url.indexOf('?') >= 0 ? '&' : '?';
+        url += separator + 'device_id=' + encodeURIComponent(currentDeviceId);
+        if (isAdmin && targetDeviceId) {
+            url += '&target_device_id=' + encodeURIComponent(targetDeviceId);
+        }
+        return url;
+    }
 
     // 显示加载状态
     function showLoading(text) {
@@ -266,6 +415,8 @@
         else if (range === 'day') url = 'api/data/day';
         else url = 'api/data/threedays';
 
+        url = buildAuthUrl(url);
+
         const progressInterval = showLoading('正在加载数据...');
         getJson(url, function(data) {
             currentData = sortDataByTime(data || []);
@@ -285,8 +436,11 @@
         const buttons = document.querySelectorAll('.btn');
         for (let i = 0; i < buttons.length; i++) { buttons[i].classList.remove('active'); }
 
+        let url = 'api/data/range?start=' + encodeURIComponent(startStr) + '&end=' + encodeURIComponent(endStr);
+        url = buildAuthUrl(url);
+
         const progressInterval = showLoading('正在查询自定义范围数据...');
-        getJson('api/data/range?start=' + encodeURIComponent(startStr) + '&end=' + encodeURIComponent(endStr), function(data) {
+        getJson(url, function(data) {
             currentData = sortDataByTime(data || []);
             updateCharts();
             renderInfoPanel(currentData.length > 0 ? currentData[currentData.length - 1] : null);
@@ -334,15 +488,15 @@
 
         panel.innerHTML = `
             <div class='sensor-card'>
-                <h3>🏠 甲醛数据 (ZE08-CH2O)</h3>
+                <h3>甲醛数据 (ZE08-CH2O)</h3>
                 <div class='data-item'><span class='data-label'>浓度 (mg/m³):</span><span class='data-value'>${ch2o.concentration_mgm3 != null ? ch2o.concentration_mgm3.toFixed(4) : '-'}</span></div>
                 <div class='data-item'><span class='data-label'>浓度 (ppm):</span><span class='data-value'>${ch2o.concentration_ppm != null ? ch2o.concentration_ppm.toFixed(4) : '-'}</span></div>
                 <div class='data-item'><span class='data-label'>浓度 (ppb):</span><span class='data-value'>${ch2o.concentration_ppb != null ? ch2o.concentration_ppb.toFixed(2) : '-'}</span></div>
-                <div class='data-item'><span class='data-label'>数据状态:</span><span class='data-value'><span class='status-indicator ${ch2oValidClass}'>${ch2oValidText}</span></span></div>
+                <div class='data-item'><span class='data-label'>数据状态:</span><span class='data-value'><span class="status-indicator ${ch2oValidClass}">${ch2oValidText}</span></span></div>
                 <div class='data-item'><span class='data-label'>健康状态:</span><span class='data-value'>${healthClass ? '<span class="status-indicator ' + healthClass + '">' + healthStatus + '</span>' : '-'}</span></div>
             </div>
             <div class='sensor-card'>
-                <h3>📡 设备信息</h3>
+                <h3>设备信息</h3>
                 <div class='data-item'><span class='data-label'>设备ID:</span><span class='data-value'>${latest.device_id || '-'}</span></div>
                 <div class='data-item'><span class='data-label'>采集时间:</span><span class='data-value'>${latest.timestamp || '-'}</span></div>
                 <div class='data-item'><span class='data-label'>运行时间:</span><span class='data-value'>${latest.uptime_seconds != null ? latest.uptime_seconds + 's' : '-'}</span></div>
@@ -494,21 +648,16 @@
             }
         };
 
-        getJson('api/data/latest', function(latest) {
+        getJson(buildAuthUrl('api/data/latest'), function(latest) {
             renderInfoPanel(latest);
             checkComplete();
         });
-        getJson('api/data/' + currentRange, function(data) {
+        getJson(buildAuthUrl('api/data/' + currentRange), function(data) {
             currentData = sortDataByTime(data || []);
             updateCharts();
             checkComplete();
         });
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        initCharts();
-        loadLatestAndData();
-    });
 </script>
 </body>
 </html>

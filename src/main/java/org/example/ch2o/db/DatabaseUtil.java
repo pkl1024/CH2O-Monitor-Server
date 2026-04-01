@@ -5,7 +5,7 @@ import java.sql.*;
 
 public class DatabaseUtil {
 
-    private static final String DB_DIR = "data";
+    private static final String DB_DIR = "/data";
     private static final String DB_FILE = DB_DIR + "/sensor_data.db";
     private static String dbUrl;
 
