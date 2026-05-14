@@ -96,6 +96,11 @@
             </div>
             <button class='btn btn-warning' onclick='logout()' style='margin-left:auto;'>退出登录</button>
         </div>
+        <div style='margin-top:15px;padding:12px 15px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;'>
+            <span style='font-weight:bold;color:#2e7d32;white-space:nowrap;'>数据上报地址:</span>
+            <code id='api-collect-url' style='background:#fff;padding:8px 12px;border-radius:5px;font-size:13px;word-break:break-all;flex:1;min-width:250px;border:1px solid #c8e6c9;'></code>
+            <button class='btn btn-secondary' onclick='copyApiUrl()' style='padding:8px 18px;font-size:13px;white-space:nowrap;'>复制</button>
+        </div>
     </div>
 
     <!-- 加载遮罩层 -->
@@ -208,6 +213,7 @@
             document.getElementById('login-panel').style.display = 'none';
             document.getElementById('user-panel').style.display = 'block';
             document.getElementById('device-name').textContent = data.device_name;
+            document.getElementById('api-collect-url').textContent = getCollectUrl();
             isAdmin = data.is_admin;
             document.getElementById('admin-indicator').style.display = isAdmin ? 'inline' : 'none';
 
@@ -239,6 +245,39 @@
 
             // 加载数据
             loadLatestAndData();
+        });
+    }
+
+    // 获取数据上报完整URL
+    function getCollectUrl() {
+        var path = window.location.pathname;
+        var contextPath = path.substring(0, path.lastIndexOf('/'));
+        return window.location.origin + contextPath + '/api/collect';
+    }
+
+    // 复制API地址
+    function copyApiUrl() {
+        const urlText = document.getElementById('api-collect-url').textContent;
+        navigator.clipboard.writeText(urlText).then(function() {
+            const btn = event.target;
+            const origText = btn.textContent;
+            btn.textContent = '已复制!';
+            btn.style.background = '#4CAF50';
+            setTimeout(function() {
+                btn.textContent = origText;
+                btn.style.background = '';
+            }, 2000);
+        }).catch(function() {
+            // fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = urlText;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('已复制: ' + urlText);
         });
     }
 
