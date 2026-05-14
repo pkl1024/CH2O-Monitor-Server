@@ -1,15 +1,17 @@
 package org.example.ch2o.config;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 /**
  * 设备配置管理类
- * 配置格式: { "userId": "设备名称" }
+ * 配置格式: { "userId": "设备名称" 或 { "name": "设备名称", "aliyun": {...} } }
  * - userId 即为设备ID，用于登录
  * - 设备名称用于前端显示
  * - 值为 "admin" 表示管理员，可查看所有设备
@@ -17,7 +19,6 @@ import java.util.*;
 public class DeviceConfig {
 
     private static final String CONFIG_FILE = "/data/devices.json";
-    private static final Gson GSON = new Gson();
 
     private static DeviceConfig instance;
     private Map<String, String> config;  // userId -> 设备名称
@@ -53,8 +54,23 @@ public class DeviceConfig {
             return;
         }
 
-        try (Reader reader = new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8)) {
-            config = GSON.fromJson(reader, new TypeToken<Map<String, String>>(){}.getType());
+        try {
+            String content = new String(Files.readAllBytes(configFile.toPath()), StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(content).getAsJsonObject();
+            Map<String, String> parsed = new HashMap<>();
+            for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
+                String key = entry.getKey();
+                JsonElement value = entry.getValue();
+                if (value.isJsonPrimitive()) {
+                    parsed.put(key, value.getAsString());
+                } else if (value.isJsonObject()) {
+                    JsonObject obj = value.getAsJsonObject();
+                    if (obj.has("name")) {
+                        parsed.put(key, obj.get("name").getAsString());
+                    }
+                }
+            }
+            config = parsed;
             lastModified = configFile.lastModified();
             System.out.println("[DeviceConfig] 配置加载成功: " + config.size() + " 个用户/设备, 路径: " + configFile.getAbsolutePath());
         } catch (Exception e) {
